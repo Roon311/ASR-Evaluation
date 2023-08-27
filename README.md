@@ -24,4 +24,4 @@ pip install pandas openpyxl
 ```bash
  docker build -t sctk .
 ```	
-#SCLITE file formating
+# SCLITE file formating
