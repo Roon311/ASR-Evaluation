@@ -9,9 +9,9 @@ The Automated Speech Recognition (ASR) Evaluation Tool is designed to streamline
 Before using the ASR Evaluation Tool, ensure you have the following prerequisites installed:
 1. **Python**: Make sure you have Python installed on your system.
 2. Packages: Install the required packages using the following command:
-'''bash
+```bash
 pip install pandas openpyxl
-'''
+```
 3.SCTK:To install compile and install sctk, from the main directory type the commands:
 
 	% make config
