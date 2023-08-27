@@ -12,7 +12,7 @@ Before using the ASR Evaluation Tool, ensure you have the following prerequisite
 ```bash
 pip install pandas openpyxl
 ```
-3.SCTK:To install compile and install sctk, from the main directory type the commands:
+3.SCTK: To install compile and install sctk, from the main directory type the commands:
 
 	% make config
 	% make all
@@ -20,4 +20,8 @@ pip install pandas openpyxl
 	% make install
 	% make doc
 
+4.Docker: A Dockerfile is included to build and use SCTK without compiling the codebase for your particular platform.
+```bash
+ docker build -t sctk .
+```	
 #SCLITE file formating
