@@ -23,5 +23,9 @@ pip install pandas openpyxl
 4.Docker: A Dockerfile is included to build and use SCTK without compiling the codebase for your particular platform.
 ```bash
  docker build -t sctk .
-```	
+```
+The command used to run sctk on linux and mac on this repository is:
+```bash
+docker run -it -v $PWD:/var/sctk sctk sclite -i wsj -r ref.txt -h hyp.txt
+```
 # SCLITE file formating
