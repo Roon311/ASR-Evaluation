@@ -30,12 +30,13 @@ docker run -it -v $PWD:/var/sctk sctk sclite -i wsj -r ref.txt -h hyp.txt
 ```
 # SCLITE file formating
 You need to add an id for each speaker, and identify the sentence of the speaker:
+```text
 Hello how are you? (spkr1-001)
 
 I am fine. (spkr2-001)
 
 What's the weather like today? (spkr1-002)
-
+```
                      SYSTEM SUMMARY PERCENTAGES by SPEAKER
 
        ,----------------------------------------------------------------.
