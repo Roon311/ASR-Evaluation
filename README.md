@@ -29,3 +29,26 @@ The command used to run sctk on linux and mac on this repository is:
 docker run -it -v $PWD:/var/sctk sctk sclite -i wsj -r ref.txt -h hyp.txt
 ```
 # SCLITE file formating
+You need to add an id for each speaker, and identify the sentence of the speaker:
+e
+Hello how are you? (spkr1-001)
+I am fine. (spkr2-001)
+What's the weather like today? (spkr1-002)
+
+                     SYSTEM SUMMARY PERCENTAGES by SPEAKER
+
+       ,----------------------------------------------------------------.
+       |                             1.txt                              |
+       |----------------------------------------------------------------|
+       | SPKR   | # Snt # Wrd | Corr    Sub    Del    Ins    Err  S.Err |
+       |--------+-------------+-----------------------------------------|
+       | spkr1  |    2      9 |100.0    0.0    0.0    0.0    0.0    0.0 |
+       |--------+-------------+-----------------------------------------|
+       | spkr2  |    1      3 |100.0    0.0    0.0    0.0    0.0    0.0 |
+       |================================================================|
+       | Sum/Avg|    3     12 |100.0    0.0    0.0    0.0    0.0    0.0 |
+       |================================================================|
+       |  Mean  |  1.5    8.5 |100.0    0.0    0.0    0.0    0.0    0.0 |
+       |  S.D.  |  0.7    2.1 |  0.0    0.0    0.0    0.0    0.0    0.0 |
+       | Median |  1.5    8.5 |100.0    0.0    0.0    0.0    0.0    0.0 |
+       `----------------------------------------------------------------'
