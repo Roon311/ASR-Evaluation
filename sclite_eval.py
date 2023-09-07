@@ -5,6 +5,7 @@ import subprocess
 import re
 import os
 import openpyxl
+import shutil
 from openpyxl.styles import Font,Alignment,Border,Side
 
 #---------------------------------------- Formatting the Files----------------------------------#
@@ -163,7 +164,7 @@ def calculate_wer(reference_file, hypothesis_file):
     swe = float(fixed_wer_line_splitted[11])
     return acc,sub,dele,ins,wer,swe
 
-def calc_folder():
+def calc_folder(base_directory = "SCLITE_Test4",hypothesisfoldername='hypothesis',referencefoldername='reference'):
     W1=[]
     W2=[]
     W3=[]
@@ -183,7 +184,6 @@ def calc_folder():
     A2=[]
     A3=[]
     # Base directory containing the folder structure
-    base_directory = "SCLITE_Test4"
     num=0
     for item in sorted(os.listdir(base_directory)):
         if item == ".DS_Store":  # Skip processing .DS_Store files
@@ -204,7 +204,7 @@ def calc_folder():
                 #looping through subfolders
                 print(subfolder)
                 subfolder_path = os.path.join(asr_path, subfolder)
-                hypref_path = os.path.join(subfolder_path, 'hypothesis')
+                hypref_path = os.path.join(subfolder_path, hypothesisfoldername)
                 count=0
                 accsub=0
                 subsub=0
@@ -219,7 +219,7 @@ def calc_folder():
                     #Here we are looping over each file
                     print(file)
                     hypothesis_file=os.path.join(hypref_path,file)
-                    reference_file = f"{subfolder_path}/reference/{file}"
+                    reference_file = f"{subfolder_path}/{referencefoldername}/{file}"
                     if formatChecker(reference_file)==False:
                         oneLiner(reference_file)
                         fileFormatter(reference_file)
@@ -240,6 +240,189 @@ def calc_folder():
                 W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3=appender(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3,accsub,subsub,delesub,inssub,wersub,swesub,num)
         num+=1
     return W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3
+
+def compreports(reference_file, hypothesis_file):
+    current_directory = os.getcwd()
+    #commands required dtl,pralign,prf,sum, rsum
+
+    docker_commands = [
+        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","dtl"],
+        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","pralign"],
+        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","prf"],
+        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","sum"],
+        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","rsum"]
+
+    ]
+    for docker_command in docker_commands: #saves 5 files
+        subprocess.run(docker_command, capture_output=True, text=True, shell=False)
+
+def generate_all_reports(base_directory = "SCLITE_Test4",hypothesisfoldername='hypothesis',referencefoldername='reference'):
+    #To generate all the reports we would need to loop through all the folders, then i will call the fix report dir in the end
+    for item in sorted(os.listdir(base_directory)):
+        if item == ".DS_Store":  
+            continue
+        print(item)
+        item_path = os.path.join(base_directory, item)
+        for asr in sorted(os.listdir(item_path)):
+            if asr == ".DS_Store":
+                continue
+            print(asr)
+            asr_path=os.path.join(item_path,asr)
+            for subfolder in sorted(os.listdir(asr_path)):
+                if subfolder == ".DS_Store":
+                    continue
+                print(subfolder)
+                subfolder_path = os.path.join(asr_path, subfolder)
+                hypref_path = os.path.join(subfolder_path, hypothesisfoldername)
+                for file in sorted(os.listdir(hypref_path)):
+                    if file == ".DS_Store":
+                        continue
+                    print(file)
+                    hypothesis_file=os.path.join(hypref_path,file)
+                    reference_file = f"{subfolder_path}/{referencefoldername}/{file}"
+                    if formatChecker(reference_file)==False:
+                        oneLiner(reference_file)
+                        fileFormatter(reference_file)
+
+                    if formatChecker(hypothesis_file)==False:
+                        oneLiner(hypothesis_file)
+                        fileFormatter(hypothesis_file)
+                    print(hypothesis_file)
+                    print(reference_file)
+                    compreports(reference_file, hypothesis_file)
+
+def fix_report_dir(base_directory = "SCLITE_Test4",report_directory="SCLITE_reports",hypothesisfoldername='hypothesis'):
+    for item in sorted(os.listdir(base_directory)):
+        if item == ".DS_Store": 
+            continue
+        print(item)
+        item_path = os.path.join(base_directory, item)
+        report_path=os.path.join(report_directory,item)
+        for asr in sorted(os.listdir(item_path)):
+            if asr == ".DS_Store":  
+                continue
+            print(asr)
+            asr_path=os.path.join(item_path,asr)
+            report_asr_path=os.path.join(report_path,asr)
+            for subfolder in sorted(os.listdir(asr_path)):
+                if subfolder == ".DS_Store":  
+                    continue
+                print(subfolder)
+                subfolder_path = os.path.join(asr_path, subfolder)
+                report_subfolder_path=os.path.join(report_asr_path,subfolder)
+                hypref_path = os.path.join(subfolder_path, hypothesisfoldername)
+                
+                for file in sorted(os.listdir(hypref_path)):
+                    if file == ".DS_Store":  
+                        continue
+                    print(file)
+                    if not os.path.exists(report_subfolder_path):
+                        os.makedirs(report_subfolder_path)
+                    
+                    if file.endswith(".txt"):                        
+                        for file_suffix in ["dtl", "pra", "raw", "sys", "prf"]:
+                            new_filename = f"{file}.{file_suffix}"
+                            hypothesis_file=os.path.join(hypref_path,new_filename)
+                            destination_file = os.path.join(report_subfolder_path, new_filename)
+                            shutil.move(hypothesis_file, destination_file)
+
+def obtain_errors(report_directory="SCLITE_reports"):
+    print("obtaining the errors")
+    reflist=[]
+    hyplist=[]
+    loclist=[]
+    ASR=[]
+    Freq=[]
+    dfs=[]
+    for item in sorted(os.listdir(report_directory)):
+        if item == ".DS_Store":  
+            continue
+        #print(item)
+        columns = ['ASR','wrng_hyp', 'wrng_ref','loc','efa']
+        wrongsdf = pd.DataFrame(columns=columns)
+        item_path = os.path.join(report_directory, item)
+        for asr in sorted(os.listdir(item_path)):
+            if asr == ".DS_Store":  
+                continue
+            print(asr)
+            asr_path=os.path.join(item_path,asr)
+            for subfolder in sorted(os.listdir(asr_path)):
+                if subfolder == ".DS_Store": 
+                    continue
+                
+                print(subfolder)
+                subfolder_path = os.path.join(asr_path, subfolder)
+                for file in sorted(os.listdir(subfolder_path)):
+                    if file == ".DS_Store":  
+                        continue
+                    if file.endswith(".dtl"):
+                        lines_to_skip=0
+                        scanned=0
+                        Activate=False
+                        file_path=os.path.join(subfolder_path,file)
+                        with open(file_path, 'r') as dtl_file:
+                            for line in dtl_file:
+                                if line.strip().startswith("CONFUSION PAIRS"):
+                                    parts = line.strip().split()
+                                    if len(parts) >= 4:
+                                        num_confusion_pairs = int(parts[3].strip('()'))
+                                        if num_confusion_pairs==0:
+                                            break
+                                        lines_to_skip=2
+                                elif lines_to_skip>0:
+                                    lines_to_skip -= 1
+                                    if lines_to_skip==0:
+                                        Activate=True
+                                elif Activate==True:
+                                    error = line.strip().split(' ==> ')
+                                    scanned+=1
+                                    wrng_hyp=error[1]
+                                    wrng_ref=error[0].split("->")[1]
+                                    wrng_ref = wrng_ref.replace("", "").strip()
+                                    root, _ = os.path.splitext(file_path)
+                                    root = file_path.replace(f"{report_directory}/{item}/", "")
+                                    new_row = {'ASR':item,'wrng_hyp': wrng_hyp, 'wrng_ref': wrng_ref ,'loc':root}
+                                    wrongsdf = wrongsdf.append(new_row, ignore_index=True)
+                                    grouped = wrongsdf.groupby(['ASR','wrng_hyp', 'wrng_ref'])['loc'].agg(', '.join).reset_index()
+                                    grouped['efa'] = grouped['loc'].str.count(',') + 1
+                                    print(grouped)
+                                    if scanned==num_confusion_pairs:
+                                        break
+        dfs.append(grouped)
+        asr_list=grouped['ASR'].tolist()
+        wrng_hyp_list = grouped['wrng_hyp'].tolist()
+        wrng_ref_list = grouped['wrng_ref'].tolist()
+        loc_list = grouped['loc'].tolist()
+        efa =grouped['efa'].tolist()
+        ASR=ASR+asr_list
+        reflist=reflist+wrng_ref_list
+        hyplist=hyplist+wrng_hyp_list
+        loclist=loclist+loc_list
+        Freq=Freq+efa
+
+    return ASR,reflist,hyplist,loclist,Freq,dfs
+
+def extract_most_reperror(dfs,numofmostrepeated=2):
+    asr=[]
+    ref=[]
+    hyp=[]
+    loc=[]
+    freq=[]
+    for df in dfs:
+        df.sort_values(by='efa', ascending=False, inplace=True)
+        if numofmostrepeated>df.shape[0]:
+            numofmost=df.shape[0]
+        else:
+            numofmost=numofmostrepeated
+
+        for i in range(numofmost):
+            row = df.iloc[i]
+            asr.append(row['ASR'])
+            ref.append(row['wrng_ref'])
+            hyp.append(row['wrng_hyp'])
+            loc.append(row['loc'])
+            freq.append(row['efa'])
+    return asr,ref,hyp,loc,freq
 
 #---------------------------------------- Creating the Tables-----------------------------------#
 
@@ -318,7 +501,37 @@ def make_final_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3):
 
     styled_df.to_excel("final_values.xlsx", engine="openpyxl")  # Save the styled DataFrame to an Excel file
 
+def error_extract_table(ASR,Ref,Hyp,Loc,Freq):
+    data = {
+    "ASR System": ASR,
+    "Reference Word": Ref,
+    "Hypothesis Word": Hyp,
+    "Location": Loc,
+    "Error Frequency in (ASR System)": Freq,
+    }
+    df = pd.DataFrame(data)
+    print(df)
+    styled_df = df.style.set_table_styles([
+        {'selector': 'th.col_heading',
+        'props': [('text-align', 'center')]}
+    ])
+    styled_df.to_excel("Error Extraction Table .xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
 
+def error_summary_table(asr,ref,hyp,loc,freq):
+    data = {
+    "ASR System": asr,
+    "Reference Word": ref,
+    "Hypothesis Word": hyp,
+    "Location": loc,
+    "Error Frequency in (ASR System)": freq,
+    }
+    df = pd.DataFrame(data)
+    print(df)
+    styled_df = df.style.set_table_styles([
+        {'selector': 'th.col_heading',
+        'props': [('text-align', 'center')]}
+    ])
+    styled_df.to_excel("Error Extraction Summary Table .xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
 #---------------------------------------- Forming the output Excel------------------------------#
 
 def combine_excel_files(file1_path, file2_path, output_path):
@@ -373,10 +586,65 @@ def formatTables():
     output_path = 'result.xlsx'
     wb.save(output_path)
 
+def formaterrorrep():
+    workbook = openpyxl.load_workbook('Error Extraction Table .xlsx')
+    ws = workbook.active
+
+    for cell in ws['D']:
+        if cell.value is not None and ',' in cell.value:
+            cell.value = '\n\n'.join(cell.value.split(', '))
+
+    column_widths = [18, 18, 18, 100, 30]
+    for col_idx, width in enumerate(column_widths, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    workbook.save('Error Extraction Table .xlsx')
+
+    workbook.close()
+
+def formaterrorsumreport():
+    workbook = openpyxl.load_workbook('Error Extraction Summary Table .xlsx')
+    ws = workbook.active
+
+    for cell in ws['D']:
+        if cell.value is not None and ',' in cell.value:
+            cell.value = '\n\n'.join(cell.value.split(', '))
+
+    column_widths = [18, 18, 18, 100, 30]
+    for col_idx, width in enumerate(column_widths, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    workbook.save('Error Extraction Summary Table .xlsx')
+
+    workbook.close()
+#---------------------------------------- Logic performers------------------------------#
+def asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername):
+    W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3=calc_folder(base_directory,hypothesisfoldername,referencefoldername)
+    make_compar_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3)
+    make_final_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3)
+    formatTables()
+
+def errorlogic(base_directory,report_directory,hypothesisfoldername,referencefoldername,numofmostrepeated):
+    generate_all_reports(base_directory)
+    fix_report_dir(base_directory ,report_directory,hypothesisfoldername)
+    ASR,reflist,hyplist,loclist,Freq,dfs=obtain_errors(report_directory)
+    error_extract_table(ASR,reflist,hyplist,loclist,Freq)
+    formaterrorrep()
+    asr,ref,hyp,loc,freq=extract_most_reperror(dfs,numofmostrepeated)
+    error_summary_table(asr,ref,hyp,loc,freq)
+    formaterrorsumreport()
+
 #----------------------------------------- Main---------------------------------------------------------#
-W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3=calc_folder()
-make_compar_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3)
-make_final_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3)
-formatTables()
+base_directory ="SCLITE_Test4"
+report_directory="SCLITE_reports"
+if os.path.exists(report_directory):
+    shutil.rmtree(report_directory)
+hypothesisfoldername='hypothesis'
+referencefoldername='reference'
+numofmostrepeated=2
+asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername)
+errorlogic(base_directory,report_directory,hypothesisfoldername,referencefoldername,numofmostrepeated)
 print('Process Complete')
 #-------------------------------------------------------------------------------------------------------#
