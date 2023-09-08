@@ -54,3 +54,22 @@ What's the weather like today? (spkr1-002)
        |  S.D.  |  0.7    2.1 |  0.0    0.0    0.0    0.0    0.0    0.0 |
        | Median |  1.5    8.5 |100.0    0.0    0.0    0.0    0.0    0.0 |
        `----------------------------------------------------------------'
+
+# Code Functions
+1.**Formatting the Files:** This section includes functions for adding periods to lines and formatting text files.
+
+2.**Forming the Lists:** Functions in this section calculate various metrics (e.g., WER, substitutions, deletions) for ASR systems and store the results in lists.
+
+3.**Calculating WER:** This section contains a function to calculate Word Error Rate (WER) using a Docker container.
+
+4.**Generating Reports:** Functions in this section generate reports for ASR system comparisons, including confusion matrices and other statistics.
+
+5.**Error Analysis:** This part of the script extracts and analyzes errors from the ASR outputs.
+
+6.**Creating Tables:** Functions for creating tables with the collected metrics and error analysis results.
+
+7.**Main Logic:** The main logic section calls the functions in the correct order to perform the desired tasks.
+
+8.**Main Function:** The script's main part specifies the input parameters and calls the functions accordingly.
+
+The script is designed to automate the process of evaluating ASR system performance, generating reports, and analyzing errors. You can customize the input parameters and run the script to perform these tasks on your data.
