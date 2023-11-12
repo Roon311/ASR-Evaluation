@@ -6,8 +6,11 @@ import re
 import os
 import openpyxl
 import shutil
+import spacy
+import enchant
+from collections import Counter 
 from openpyxl.styles import Font,Alignment,Border,Side
-
+nlp = spacy.load("de_core_news_sm")
 #---------------------------------------- Formatting the Files----------------------------------#
 
 def add_period_to_lines(file_path):
@@ -27,7 +30,6 @@ def add_period_to_lines(file_path):
         print(f"An error occurred: {e}")
 
 def oneLiner(filepath):
-    add_period_to_lines(filepath)
     try:
         with open(filepath, 'r') as file:
             content = file.read().replace('\n', ' ')
@@ -39,21 +41,58 @@ def oneLiner(filepath):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-def formatChecker(file_path):
-    try:
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
+def fix_hyp_length(hyp_path,ref_path):
+    with open(hyp_path, "r") as file:
+        hyplines = file.readlines()
+    with open(ref_path,"r") as file:
+        reflines=file.readlines()
 
-        for line_number, line in enumerate(lines, start=1):
-            line = line.strip()
-            if re.search(r'\s+\(a\d+\)$', line):  
-                print(f"Line {line_number} ends with the specified pattern.")# Matches a line ending with space + (a line number) pattern
-                return True
-            else:
-                print(f"Line {line_number} does not end with the specified pattern.")
-                return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    count=0
+    corrected_hyplines = [] 
+    for hypline,refline in zip(hyplines,reflines):
+        count+=1
+        hypwords = hypline.split()
+        refwords = refline.split()
+        print(f"Line {count}: Number of words in hyp= {len(hypwords)}, number of words in ref= {len(refwords)}")
+        if len(hypwords)<len(refwords):
+           difference = len(refwords) - len(hypwords)
+           hypline = hypline.rstrip('\n')
+           hypline = hypline[:-1] + " -"* difference + ".\n"
+           print('hyphen added')
+        corrected_hyplines.append(hypline)
+    with open(hyp_path, "w") as file:
+        file.writelines(corrected_hyplines)
+        
+def file_format_checker(file_path):
+    punctuation_marks = ['.', ',', ';', '?', '!']
+    
+    with open(file_path, "r") as file:
+        content = file.read()
+
+    for char in content:
+        if char in punctuation_marks:
+            return False
+    
+    return True
+
+def lineDivider(path):
+    with open(path, "r") as file:
+        text = file.read()
+    sentences = re.split(r'(?<=[.!?])(?!\s*[.!?])', text)# Split the text into sentences using a regex pattern
+    modified_sentences = []
+    for i, sentence in enumerate(sentences, start=1):
+        modified_sentence = sentence.strip()
+        modified_sentences.append(modified_sentence)
+    new_text = "\n".join(modified_sentences)
+
+    lines = new_text.split("\n")
+    last_line = lines[-1].strip()
+    if re.match(r'\(a\d+\)', last_line):
+        lines.pop()
+    new_text = "\n".join(lines)
+
+    with open(path, "w") as file:
+        file.write(new_text)
 
 def fileFormatter(path):
 
@@ -83,6 +122,30 @@ def fileFormatter(path):
 
     with open(path, "w") as file:
         file.write(new_text)
+
+def remove_punc(filepath):
+    with open(filepath, 'r') as file:
+        text = file.read()
+
+    # Remove the specified characters
+    text = text.replace(',', '')
+    text = text.replace('.', '')
+    text = text.replace(';', '')
+    text = text.replace('?', '')
+    text = text.replace('!', '')
+    with open(filepath, 'w') as file:
+        file.write(text)
+        file.write('\n')
+        
+def small_files(filepath):
+    try:
+        with open(filepath, "r", encoding="utf-8") as file:
+            content = file.read().lower()
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(content)
+        print(f"File '{filepath}' has been converted to lowercase.")
+    except FileNotFoundError:
+        print(f"File '{filepath}' not found.")
 
 #---------------------------------------- Forming the Lists-------------------------------------#
 
@@ -131,7 +194,7 @@ def appender(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3,accsub,subsub
 def calculate_wer(reference_file, hypothesis_file):
     current_directory = os.getcwd()
     docker_command = [
-        "docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}"
+        "sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}"
     ]
 
 
@@ -220,13 +283,28 @@ def calc_folder(base_directory = "SCLITE_Test4",hypothesisfoldername='hypothesis
                     print(file)
                     hypothesis_file=os.path.join(hypref_path,file)
                     reference_file = f"{subfolder_path}/{referencefoldername}/{file}"
-                    if formatChecker(reference_file)==False:
-                        oneLiner(reference_file)
-                        fileFormatter(reference_file)
+                    small_files(reference_file)
+                    small_files(hypothesis_file)
+                    add_period_to_lines(reference_file)
+                    add_period_to_lines(hypothesis_file)
+                    if file_format_checker(reference_file)==False:
+                        add_period_to_lines(reference_file)
+                        lineDivider(reference_file)
 
-                    if formatChecker(hypothesis_file)==False:
+                    if file_format_checker(hypothesis_file)==False:
+                        add_period_to_lines(hypothesis_file)
+                        lineDivider(hypothesis_file)
+                        fix_hyp_length(hypothesis_file,reference_file)
+
+                    
+                    if file_format_checker(hypothesis_file)==False:
                         oneLiner(hypothesis_file)
-                        fileFormatter(hypothesis_file)
+                        remove_punc(hypothesis_file)
+                    
+                    if file_format_checker(reference_file)==False:
+                        oneLiner(reference_file)
+                        remove_punc(reference_file)
+
                     print(hypothesis_file)
                     print(reference_file)
                     acc,sub,dele,ins,wer,swe=calculate_wer(reference_file, hypothesis_file)
@@ -246,11 +324,11 @@ def compreports(reference_file, hypothesis_file):
     #commands required dtl,pralign,prf,sum, rsum
 
     docker_commands = [
-        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","dtl"],
-        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","pralign"],
-        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","prf"],
-        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","sum"],
-        ["docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","rsum"]
+        ["sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","dtl"],
+        ["sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","pralign"],
+        ["sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","prf"],
+        ["sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","sum"],
+        ["sudo","docker", "run", "-it", "-v", f"{current_directory}:/var/sctk", "sctk", "sclite", "-i", "wsj", "-r", f"{reference_file}", "-h", f"{hypothesis_file}","-o","rsum"]
 
     ]
     for docker_command in docker_commands: #saves 5 files
@@ -280,13 +358,7 @@ def generate_all_reports(base_directory = "SCLITE_Test4",hypothesisfoldername='h
                     print(file)
                     hypothesis_file=os.path.join(hypref_path,file)
                     reference_file = f"{subfolder_path}/{referencefoldername}/{file}"
-                    if formatChecker(reference_file)==False:
-                        oneLiner(reference_file)
-                        fileFormatter(reference_file)
 
-                    if formatChecker(hypothesis_file)==False:
-                        oneLiner(hypothesis_file)
-                        fileFormatter(hypothesis_file)
                     print(hypothesis_file)
                     print(reference_file)
                     compreports(reference_file, hypothesis_file)
@@ -334,6 +406,7 @@ def obtain_errors(report_directory="SCLITE_reports"):
     ASR=[]
     Freq=[]
     dfs=[]
+    errdf=[]
     for item in sorted(os.listdir(report_directory)):
         if item == ".DS_Store":  
             continue
@@ -342,6 +415,7 @@ def obtain_errors(report_directory="SCLITE_reports"):
         wrongsdf = pd.DataFrame(columns=columns)
         item_path = os.path.join(report_directory, item)
         for asr in sorted(os.listdir(item_path)):
+            grouped = pd.DataFrame(columns=['ASR', 'wrng_hyp', 'wrng_ref', 'loc', 'efa'])
             if asr == ".DS_Store":  
                 continue
             print(asr)
@@ -399,8 +473,9 @@ def obtain_errors(report_directory="SCLITE_reports"):
         hyplist=hyplist+wrng_hyp_list
         loclist=loclist+loc_list
         Freq=Freq+efa
+        errdf.append(wrongsdf)
 
-    return ASR,reflist,hyplist,loclist,Freq,dfs
+    return ASR,reflist,hyplist,loclist,Freq,dfs,errdf
 
 def extract_most_reperror(dfs,numofmostrepeated=2):
     asr=[]
@@ -532,7 +607,408 @@ def error_summary_table(asr,ref,hyp,loc,freq):
         'props': [('text-align', 'center')]}
     ])
     styled_df.to_excel("Error Extraction Summary Table .xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
-#---------------------------------------- Forming the output Excel------------------------------#
+
+
+def make_compar_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3):
+    columns = pd.MultiIndex.from_product([['WER', 'Sentence with Errors', 'Word substitutions', 'Word deletions', 'Word insertions', 'Word Accuracy'],
+                                      ['ASR1', 'ASR2', 'ASR3']],
+                                      names=[None, None])
+    index = pd.MultiIndex.from_product([['main subfolder A', 'main subfolder B'],
+                                    ['Subfolder 1', 'Subfolder 2', 'Subfolder 3', 'Subfolder 4', 'Subfolder 5']],
+                                    names=[None, None])
+    data = {
+    ('WER', 'ASR1'): W1,
+    ('WER', 'ASR2'): W2,
+    ('WER', 'ASR3'): W3,
+    ('Sentence with Errors', 'ASR1'): E1,
+    ('Sentence with Errors', 'ASR2'): E2,
+    ('Sentence with Errors', 'ASR3'): E3,
+    ('Word substitutions', 'ASR1'): S1,
+    ('Word substitutions', 'ASR2'): S2,
+    ('Word substitutions', 'ASR3'): S3,
+    ('Word deletions', 'ASR1'): D1,
+    ('Word deletions', 'ASR2'): D2,
+    ('Word deletions', 'ASR3'): D3,
+    ('Word insertions', 'ASR1'): I1,
+    ('Word insertions', 'ASR2'): I2,
+    ('Word insertions', 'ASR3'): I3,
+    ('Word Accuracy', 'ASR1'): A1,
+    ('Word Accuracy', 'ASR2'): A2,
+    ('Word Accuracy', 'ASR3'): A3
+    }
+
+    df = pd.DataFrame(data, columns=columns, index=index)
+    
+    styled_df = df.style.set_table_styles([
+        {'selector': 'th.col_heading',
+        'props': [('text-align', 'center')]}
+    ])
+
+    styled_df.to_excel("folder_values.xlsx", engine="openpyxl")  # Save the styled DataFrame to an Excel file
+    #print(df.head(50))# Display the DataFrame Debugging
+
+def most_common(lst):
+    # Filter out nan values from the list
+    filtered_lst = [x for x in lst if not pd.isna(x)]
+    
+    if filtered_lst:
+        count = Counter(filtered_lst)
+        most_common_errors = count.most_common(1)
+        return most_common_errors[0][0]
+    else:
+        return None
+
+# Define a function to obtain the highest frequency while ignoring nan values
+def highest_frequency(lst):
+    # Filter out nan values from the list
+    filtered_lst = [x for x in lst if not pd.isna(x)]
+    
+    if filtered_lst:
+        return max(filtered_lst)
+    else:
+        return None
+def make_mostError_table(Dataf):
+    data = {
+    'ASR': ['ASR1']*10 + ['ASR2']*10 + ['ASR3']*10,
+    'Mainsubfolder': ['Main_Subfolder_A']*5 + ['Main_Subfolder_B']*5 + ['Main_Subfolder_A']*5 + ['Main_Subfolder_B']*5 + ['Main_Subfolder_A']*5 + ['Main_Subfolder_B']*5,
+    'Folder': ['a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'b2', 'b3', 'b4', 'b5']*3,
+    'Error': ['none']*30,
+    'Frequency': ['none']*30
+}
+
+# Create the DataFrame
+    main = pd.DataFrame(data)
+
+    Dataf['Mainsubfolder'] = Dataf['Location'].str.extract(r'(Main_Subfolder_[A-Z]+)/')
+    Dataf['Folder'] = Dataf['Location'].str.extract(r'Main_Subfolder_[A-Z]+/([a-z\d-]+)')
+    # Count the frequency of each error type
+    Dataf['Error Type'] = Dataf['Error Type'].apply(tuple)  # Convert the lists to tuples for counting
+    error_frequencies = Dataf.groupby(['ASR', 'Mainsubfolder', 'Folder'])['Error Type'].value_counts().reset_index(name='Frequency')
+
+    # Get the most frequent error for each group
+    most_frequent_error = error_frequencies.groupby(['ASR', 'Mainsubfolder', 'Folder']).first().reset_index()
+
+    merged_df = pd.merge(main, most_frequent_error, on=['ASR', 'Mainsubfolder', 'Folder'], how='outer')
+
+    print(Dataf)
+    print(most_frequent_error)
+    print(merged_df)
+    Er_list = merged_df['Error Type'].tolist()
+    divided_lists = [Er_list[i:i+10] for i in range(0, len(Er_list), 10)]
+    Er1=divided_lists[0]
+    Er2=divided_lists[1]
+    Er3=divided_lists[2]
+
+    Fr_list = merged_df['Frequency_y'].tolist()
+    fr_divided_lists = [Fr_list[i:i+10] for i in range(0, len(Fr_list), 10)]    
+    Freq1=fr_divided_lists[0]
+    Freq2=fr_divided_lists[1]
+    Freq3=fr_divided_lists[2]
+
+
+    columns = pd.MultiIndex.from_product([['Most Common Error Type', 'Error Frequency'],
+                                      ['ASR1', 'ASR2', 'ASR3']],
+                                      names=[None, None])
+
+    index = pd.MultiIndex.from_product([['main subfolder A', 'main subfolder B'],
+                                    ['Subfolder 1', 'Subfolder 2', 'Subfolder 3', 'Subfolder 4', 'Subfolder 5']],
+                                    names=[None, None])
+    data = {
+    ('Most Common Error Type', 'ASR1'): Er1,
+    ('Most Common Error Type', 'ASR2'): Er2,
+    ('Most Common Error Type', 'ASR3'): Er3,
+    ('Error Frequency', 'ASR1'): Freq1,
+    ('Error Frequency', 'ASR2'): Freq2,
+    ('Error Frequency', 'ASR3'): Freq3
+    }
+
+    df = pd.DataFrame(data, columns=columns, index=index)
+    
+    styled_df = df.style.set_table_styles([
+        {'selector': 'th.col_heading',
+        'props': [('text-align', 'center')]}
+    ])
+
+    styled_df.to_excel("MostFrequentErrorPerEverything.xlsx", engine="openpyxl")  # Save the styled DataFrame to an Excel file
+    #print(df.head(50))# Display the DataFrame Debugging
+
+
+
+    # Extract the most repeated error and obtain the highest frequency for ER1[0:5]
+    most_repeated_error_ER1_0_5 = most_common(Er1[0:5])
+    highest_frequency_ER1_0_5 = highest_frequency(Freq1[0:5])
+
+    # Extract the most repeated error and obtain the highest frequency for ER1[5:10]
+    most_repeated_error_ER1_5_10 = most_common(Er1[5:10])
+    highest_frequency_ER1_5_10 = highest_frequency(Freq1[5:10])
+
+    # Repeat the same process for ER2 and ER3 subsets
+
+    # Extract the most repeated error and obtain the highest frequency for ER2[0:5]
+    most_repeated_error_ER2_0_5 = most_common(Er2[0:5])
+    highest_frequency_ER2_0_5 = highest_frequency(Freq2[0:5])
+
+    # Extract the most repeated error and obtain the highest frequency for ER2[5:10]
+    most_repeated_error_ER2_5_10 = most_common(Er2[5:10])
+    highest_frequency_ER2_5_10 = highest_frequency(Freq2[5:10])
+
+    # Repeat the same process for ER3 subsets
+
+    # Extract the most repeated error and obtain the highest frequency for ER3[0:5]
+    most_repeated_error_ER3_0_5 = most_common(Er3[0:5])
+    highest_frequency_ER3_0_5 = highest_frequency(Freq3[0:5])
+
+    # Extract the most repeated error and obtain the highest frequency for ER3[5:10]
+    most_repeated_error_ER3_5_10 = most_common(Er3[5:10])
+    highest_frequency_ER3_5_10 = highest_frequency(Freq3[5:10])
+    # Find the most repeated error and highest frequency in Er1
+    most_repeated_error_Er1 = most_common(Er1)
+
+    # Find the most repeated error and highest frequency in Er2
+    most_repeated_error_Er2 = most_common(Er2)
+
+    # Find the most repeated error and highest frequency in Er3
+    most_repeated_error_Er3 = most_common(Er3)
+
+    # Find the most repeated error and highest frequency in Freq1
+    highest_frequency_Freq1 = highest_frequency(Freq1)
+
+    # Find the most repeated error and highest frequency in Freq2
+    highest_frequency_Freq2 = highest_frequency(Freq2)
+
+    # Find the most repeated error and highest frequency in Freq3
+    highest_frequency_Freq3 = highest_frequency(Freq3)
+    
+    columns = pd.MultiIndex.from_product([['Most Common Error Type', 'Error Frequency'],
+                                      ['ASR1', 'ASR2', 'ASR3']],
+                                      names=[None, None])
+
+    index = pd.MultiIndex.from_product([['main subfolder A', 'main subfolder B','Whole Subfolder']],
+                                    names=[None])
+    data = {
+    ('Most Common Error Type', 'ASR1'): [most_repeated_error_ER1_0_5,most_repeated_error_ER1_5_10,most_repeated_error_Er1],
+    ('Most Common Error Type', 'ASR2'): [most_repeated_error_ER2_0_5,most_repeated_error_ER2_5_10,most_repeated_error_Er2],
+    ('Most Common Error Type', 'ASR3'): [most_repeated_error_ER3_0_5,most_repeated_error_ER3_5_10,most_repeated_error_Er3],
+    ('Error Frequency', 'ASR1'): [highest_frequency_ER1_0_5,highest_frequency_ER1_5_10,highest_frequency_Freq1],
+    ('Error Frequency', 'ASR2'): [highest_frequency_ER2_0_5,highest_frequency_ER2_5_10,highest_frequency_Freq2],
+    ('Error Frequency', 'ASR3'): [highest_frequency_ER3_0_5,highest_frequency_ER3_5_10,highest_frequency_Freq3]
+    }
+
+    df = pd.DataFrame(data, columns=columns, index=index)
+    
+    styled_df = df.style.set_table_styles([
+        {'selector': 'th.col_heading',
+        'props': [('text-align', 'center')]}
+    ])
+
+    styled_df.to_excel("MostFrequentErrorPerEverythingSummary.xlsx", engine="openpyxl")  # Save the styled DataFrame to an Excel file
+    #print(df.head(50))# Display the DataFrame Debugging
+
+
+# ---------------------------------------- Forming Errors ---------------------------------------#
+def check_word_noun(file_path, word_to_check):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        text = file.read()
+
+    doc = nlp(text)
+
+    for token in doc:
+        if token.text.lower() == word_to_check.lower() and \
+           token.pos_ == 'NOUN' and \
+           (token.i == 0 or doc[token.i - 1].pos_ not in ['DET', 'ADP']):
+            return True
+
+def check_compound_words(file_path, word_to_check,ref_word):
+    with open(file_path, "r", encoding="utf-8") as file:
+        text = file.read()
+    doc = nlp(text)
+    ref_word = ref_word.replace("-", "").lower()  # Remove hyphen from reference word and convert to lowercase
+    for i, token in enumerate(doc):
+        if token.text.lower() == word_to_check.lower():
+            if i > 0:
+                compound_candidate = (doc[i - 1].text.lower() + word_to_check.lower()).strip()
+                if compound_candidate == ref_word.lower():
+                    return True
+            if i < len(doc) - 1:
+                compound_candidate = (word_to_check.lower() + doc[i + 1].text.lower()).strip()
+                if compound_candidate == ref_word.lower():
+                    return True
+    return False
+
+def check_hesitations(file_path, word_to_check):
+    hesitations=['ah','ahm','ehm','äh','ähm','hmm',
+                 'ja','ne','jane','mhm','hm','oh','hä',
+                 'öhm','also','naja','na','halt','ja',
+                 'oder','also','so','nee','nö','ach',
+                 'doch','nun','sozusagen','quasi','tja',
+                 'ok','gell','sowieso','oder','eben','boah','klar',
+                 'eieiei','dinge','und','jein','jain','echt','komm','au',
+                 'pfui','uff','huch','haha','brr','hoho','aha','ohje','ui',
+                 'puh','herrje','hoppla','krass','nanu','auweia','juchzen',
+                 'bah','quatsch','ey','hehe','papperlapapp','uff','bäh','hihi',
+                 'och','puh','hups','olle','menschenkinder','wahnsinn','mensch',
+                 'soso','holla','upsala','donnerwetter','hör','he','ey','aua',
+                 'zack','jawoll','jawohl','Alter','was','tschö','schwupps',
+                 'Mumpitz','Prost','kuckuck','nun','uiuiui','igitt',
+                 'igittegittegitt','heul','jesses','nanana','mm','mmm','mmmm','hm','hmm','hmmm']
+    if word_to_check.lower() in hesitations:
+        return True
+
+def cologne_phonetics(input_str):
+    lookup_table = {
+        'A': '0', 'E': '0', 'I': '0', 'J': '0', 'O': '0', 'U': '0', 'Y': '0',
+        'H': '-',
+        'B': '1',
+        'P': '1',
+        'D': '2', 'T': '2',
+        'F': '3', 'V': '3', 'W': '3',
+        'G': '4', 'K': '4', 'Q': '4',
+        'C': '4',
+        'X': '48',
+        'L': '5',
+        'M': '6', 'N': '6',
+        'R': '7',
+        'S': '8', 'Z': '8',
+    }
+    phonetic_code = ''.join([lookup_table.get(char.upper(), char) for char in input_str])
+
+    phonetic_code = ''.join(char for i, char in enumerate(phonetic_code) if i == 0 or char != phonetic_code[i - 1])
+
+    if phonetic_code.startswith('0'):
+        phonetic_code = '0' + phonetic_code.replace('0', '')
+    else:
+        phonetic_code = phonetic_code.replace('0', '')
+
+    return phonetic_code
+
+def has_phonetic_error(reference_word, hypothesis_word):
+    if hypothesis_word=='-':
+        return False
+    reference_phonetic = cologne_phonetics(reference_word)
+    hypothesis_phonetic = cologne_phonetics(hypothesis_word)
+    
+    return reference_phonetic != hypothesis_phonetic
+
+def deletion_Error(hypothesis_word):
+    if hypothesis_word=='-':
+        return True
+
+def partial_Error(hypothesis_word, reference_word):
+    return hypothesis_word in reference_word
+
+def partial_Error2(hypothesis_word, reference_word):
+    return reference_word in hypothesis_word
+
+def is_german_word(word):
+    german_dict = enchant.Dict("de_DE")
+    return german_dict.check(word)
+
+def ErrorsinDF(df,base_directory):
+    print('-----------------------Errors in DF---------------------')
+    errorType=[]
+    print(df)
+    df = pd.concat(df, ignore_index=True)
+    df.drop(columns='efa', inplace=True)
+    print(df)
+    for index, row in df.iterrows():
+        types_per_row=[]    
+        file_path = os.path.join(row['ASR'], row['loc'])
+        file_path = file_path.rsplit('.dtl', 1)[0]
+        file_path=os.path.join(base_directory,file_path)
+        directory_to_insert = 'hypothesis'
+        directory, filename = os.path.split(file_path)
+        file_path = os.path.join(directory, directory_to_insert, filename)
+        print(file_path)
+        result=check_word_noun(file_path, row['wrng_hyp'])
+        if result==True:
+            types_per_row.append('noun-article-mismatch')
+        compresult=check_compound_words(file_path, row['wrng_hyp'],row['wrng_ref'])
+        if compresult==True:
+            types_per_row.append('compound-word-split')
+        hesi_result=check_hesitations(file_path, row['wrng_hyp'])
+        if hesi_result==True:
+            types_per_row.append('Hesitation')
+        phonetic_result=has_phonetic_error(row['wrng_ref'], row['wrng_hyp'])
+        if phonetic_result==True:
+            types_per_row.append('Phonetic Error')       
+        deletion_result=deletion_Error(row['wrng_hyp'])
+        if deletion_result==True:
+            types_per_row.append('Deletion Error') 
+        partial_result=partial_Error(row['wrng_hyp'],row['wrng_ref'])
+        if partial_result==True:
+            types_per_row.append('Partial Error') 
+        partial_result2=partial_Error2(row['wrng_hyp'],row['wrng_ref'])
+        if partial_result2==True:
+            types_per_row.append('Partial Error') 
+        german_result=is_german_word(row['wrng_hyp'])
+        if german_result==True:
+            types_per_row.append('Not German word')         
+        errorType.append(types_per_row)
+
+    df['Error Type']=errorType
+    df = df.rename(columns={'wrng_hyp': 'Hypothesis word', 'wrng_ref': 'Reference word', 'loc': 'Location'})
+    print(df)
+    styled_df = df.style.set_table_styles([
+    {'selector': 'th.col_heading',
+    'props': [('text-align', 'center')]}
+    ])
+    styled_df.to_excel("Error Classification table.xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
+    workbook = openpyxl.load_workbook('Error Classification table.xlsx')
+    ws = workbook.active
+    column_widths = [18, 18, 18, 100, 60]
+    for col_idx, width in enumerate(column_widths, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    workbook.save('Error Classification table.xlsx')
+
+    workbook.close()
+
+    flattened_errors = df['Error Type'].apply(pd.Series).stack().reset_index(drop=True)
+
+    most_common_errors = df.groupby('ASR').apply(lambda x: Counter(x['Error Type'].sum()).most_common(1)[0]).reset_index()
+    most_common_errors.columns = ['ASR', 'Most Common Error Type,Frequency']
+
+    #most_common_errors['Frequency'] = most_common_errors['Most Common Error Type'].apply(lambda x: x[1])
+    styled_df_most = most_common_errors.style.set_table_styles([
+    {'selector': 'th.col_heading',
+    'props': [('text-align', 'center')]}
+    ])
+    styled_df_most.to_excel("Most Error Classification table.xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
+    workbook = openpyxl.load_workbook('Most Error Classification table.xlsx')
+    ws = workbook.active
+    column_widths = [18, 40]
+    for col_idx, width in enumerate(column_widths, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+    workbook.save('Most Error Classification table.xlsx')
+    workbook.close()
+    print(most_common_errors)
+
+
+
+    flattened_errors = df['Error Type'].apply(pd.Series).stack().reset_index(drop=True)
+    error_frequencies = Counter(flattened_errors)
+    error_df = pd.DataFrame(error_frequencies.items(), columns=['Error Type', 'Frequency'])
+    print(error_df)
+    styled_df_type = error_df.style.set_table_styles([
+    {'selector': 'th.col_heading',
+    'props': [('text-align', 'center')]}
+    ])
+    styled_df_type.to_excel("Error Classification Frequency table.xlsx", engine="openpyxl",index=False)  # Save the styled DataFrame to an Excel file
+    workbook = openpyxl.load_workbook('Error Classification Frequency table.xlsx')
+    ws = workbook.active
+    column_widths = [30, 30, 30]
+    for col_idx, width in enumerate(column_widths, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+    workbook.save('Error Classification Frequency table.xlsx')
+    workbook.close()
+
+    return df
+
+
+# ---------------------------------------- Forming the output Excel------------------------------#
 
 def combine_excel_files(file1_path, file2_path, output_path):
     wb1 = openpyxl.load_workbook(file1_path)
@@ -626,25 +1102,27 @@ def asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername):
     make_final_table(W1,W2,W3,E1,E2,E3,S1,S2,S3,D1,D2,D3,I1,I2,I3,A1,A2,A3)
     formatTables()
 
-def errorlogic(base_directory,report_directory,hypothesisfoldername,referencefoldername,numofmostrepeated):
-    generate_all_reports(base_directory)
-    fix_report_dir(base_directory ,report_directory,hypothesisfoldername)
-    ASR,reflist,hyplist,loclist,Freq,dfs=obtain_errors(report_directory)
+def errorlogic(base_directory,report_directory,hypothesisfoldername,numofmostrepeated):
+#    generate_all_reports(base_directory)
+#    fix_report_dir(base_directory ,report_directory,hypothesisfoldername)
+    ASR,reflist,hyplist,loclist,Freq,dfs,errorsdf=obtain_errors(report_directory)
     error_extract_table(ASR,reflist,hyplist,loclist,Freq)
+    df=ErrorsinDF(errorsdf,base_directory)
+    make_mostError_table(df)
     formaterrorrep()
     asr,ref,hyp,loc,freq=extract_most_reperror(dfs,numofmostrepeated)
     error_summary_table(asr,ref,hyp,loc,freq)
     formaterrorsumreport()
 
 #----------------------------------------- Main---------------------------------------------------------#
-base_directory ="SCLITE_Test4"
-report_directory="SCLITE_reports"
-if os.path.exists(report_directory):
-    shutil.rmtree(report_directory)
+base_directory ="SCLITE_Test10"
+report_directory="SCLITE_reports4"
+#if os.path.exists(report_directory):
+#    shutil.rmtree(report_directory)
 hypothesisfoldername='hypothesis'
 referencefoldername='reference'
 numofmostrepeated=2
-asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername)
-errorlogic(base_directory,report_directory,hypothesisfoldername,referencefoldername,numofmostrepeated)
+#asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername)
+errorlogic(base_directory,report_directory,hypothesisfoldername,numofmostrepeated)
 print('Process Complete')
 #-------------------------------------------------------------------------------------------------------#
