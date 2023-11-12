@@ -1103,8 +1103,8 @@ def asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername):
     formatTables()
 
 def errorlogic(base_directory,report_directory,hypothesisfoldername,numofmostrepeated):
-#    generate_all_reports(base_directory)
-#    fix_report_dir(base_directory ,report_directory,hypothesisfoldername)
+    generate_all_reports(base_directory)
+    fix_report_dir(base_directory ,report_directory,hypothesisfoldername)
     ASR,reflist,hyplist,loclist,Freq,dfs,errorsdf=obtain_errors(report_directory)
     error_extract_table(ASR,reflist,hyplist,loclist,Freq)
     df=ErrorsinDF(errorsdf,base_directory)
@@ -1117,12 +1117,12 @@ def errorlogic(base_directory,report_directory,hypothesisfoldername,numofmostrep
 #----------------------------------------- Main---------------------------------------------------------#
 base_directory ="SCLITE_Test10"
 report_directory="SCLITE_reports4"
-#if os.path.exists(report_directory):
-#    shutil.rmtree(report_directory)
+if os.path.exists(report_directory):
+    shutil.rmtree(report_directory)
 hypothesisfoldername='hypothesis'
 referencefoldername='reference'
 numofmostrepeated=2
-#asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername)
+asrcomparelogic(base_directory,hypothesisfoldername,referencefoldername)
 errorlogic(base_directory,report_directory,hypothesisfoldername,numofmostrepeated)
 print('Process Complete')
 #-------------------------------------------------------------------------------------------------------#
