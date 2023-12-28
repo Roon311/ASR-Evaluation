@@ -175,8 +175,3 @@ errorlogic(base_directory, report_directory, hypothesis_foldername, num_of_most_
 print('Process Complete')
 ```
 The script is designed to automate the process of evaluating ASR system performance, generating reports, and analyzing errors. You can customize the input parameters and run the script to perform these tasks on your data.
-
-Feel free to adapt the example and instructions based on your specific use case.
-```
-
-This extended README provides more detailed instructions, usage guidelines, and an example to help users understand and use your ASR Evaluation Tool more effectively.
